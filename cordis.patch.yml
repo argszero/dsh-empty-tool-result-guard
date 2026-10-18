@@ -1,0 +1,77 @@
+# The @argszero/dsh-empty-tool-result-guard bundle patch: mount and go.
+#
+# A session stops being usable when a tool result reaches the Messages endpoint
+# carrying nothing, because the endpoint answers
+#
+#   messages.61.1: tool_use ids were found without tool_result blocks
+#   immediately after: CALL_A
+#
+# while the conversation plainly holds that call and its result, adjacent, with
+# the same id.
+#
+# Both statements are true because they count different quantities. The shipped
+# serializer builds each tool-role message into one `tool_result` block whose
+# `content` is produced by that file's own `input()`
+# (packages/llm/llm-deepseek/src/serialize.ts): an empty text block is dropped,
+# `reasoning` and `tool-call` blocks never pass at that position, and an image
+# becomes a handle plus payload. A result whose every block is dropped therefore
+# serializes to
+#
+#   {"type": "tool_result", "tool_use_id": "CALL_A", "content": []}
+#
+# The serializer's own pairing invariant — the `pending` set that an assistant
+# tool call fills and a tool result empties — works on ids alone, and its doc
+# comment states the retention deliberately: empty tool results "retain their
+# call ids". So the local invariant declares the pair answered, and the block it
+# declared is one the endpoint does not count as a result.
+#
+# That is also why an offline rebuild of the same session log cannot find it:
+# rebuilding walks the same messages through the same rules and asks the same
+# id-shaped question, so it answers "paired". The reconciliation agrees with the
+# serializer because it borrows its question; the fact that differs is on the
+# wire, not in the log.
+#
+# A plugin cannot reach inside `input()`, and does not need to. `llm/stream` is a
+# waterfall:
+#
+#   packages/llm/llm/src/index.ts
+#     streamWithRegistration(options) {
+#       return this.ctx.waterfall(this, 'llm/stream', options, () => this.adapterStream(options))
+#     }
+#
+# A loop-built request arrives deep frozen — its content is a pure function of the
+# session log — and `next()` takes no argument, so the only way to hand the
+# adapter a different request is to ask the runtime for a stream of that request:
+# `ctx.llm.stream(replacement)`. That re-enters this same waterfall, so the
+# listener sees its own replacement; identity is what stops it, and every object
+# this plugin builds is recorded in a `WeakSet`.
+#
+# The decision is made from the request alone — does any tool result hold a block
+# this position can represent? — so there is no second, refusal-driven trigger and
+# no provider feedback to interpret. The repair is additive: the result gains one
+# non-empty text block in front, every block it already had stays, and the call id
+# is untouched, because the conversation already answered that call and the repair
+# supplies content rather than identity.
+#
+# Nothing is written to the session log or to disk: the plugin repairs the
+# request about to be sent, not the history that produced it.
+#
+# The plugin has no runtime dependency. It imports no harness package for value —
+# only types — so a `profile` deployment cannot materialize a second copy of a
+# harness package, a failure this repository has already shipped more than once.
+#
+# `mode: 'guard'` (the default) repairs. `observe` decides and counts exactly as
+# `guard` would and changes nothing, which is how an operator finds out whether a
+# route actually produces the shape before trusting a rewrite with it; `off`
+# installs no listener. `{{emptyToolResultGuard}}` serves `snapshot()` — what was
+# seen, what was replaced, and the plugin's own blind spots on every read.
+#
+# `providers` narrows the guard to named routes and is empty by default: the
+# emptiness belongs to the history, and every Messages-shaped route counts the
+# same way.
+
+- insert:
+    - id: empty-tool-result-guard
+      name: '@argszero/dsh-empty-tool-result-guard'
+      config:
+        mode: guard

@@ -1,0 +1,73 @@
+{
+  "name": "@argszero/dsh-empty-tool-result-guard",
+  "description": "Keeps a request legal when a tool result carries nothing the Messages serializer can represent. Discussions #10186 reports a session that switches from a custom `llm-pi-ai` route to `deepseek-official` and is answered with `messages.61.1: tool_use ids were found without tool_result blocks immediately after: CALL_A` - while the reporter's own offline rebuild of the same history shows the call and its result adjacent. Both observations are true, because the shipped serializer validates a different quantity than the provider does. serialize() ends with an id-only pairing invariant (`serialize.ts`, `pending` set): an unmatched call, a duplicate id or a dangling tail each throw locally, so a request whose ids are wrong never leaves the process. What that invariant never looks at is what a tool_result block *carries*: input() drops every empty text block and never passes reasoning or tool-call blocks, and the file's own comment says empty tool results `retain their call ids`. A result whose contents are all dropped therefore reaches the wire as `{\"type\":\"tool_result\",\"tool_use_id\":X,\"content\":[]}` - a block the endpoint does not count as a result, on a call the local check just declared paired. This plugin puts a different request in front of the dispatch: every tool result whose content nothing can represent gains one non-empty text block, so the block the conversation already had stays and the content it lacked is supplied. Nothing is written to the session log or to disk, zero runtime dependencies, fail-open.",
+  "version": "0.1.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/**/*.js",
+    "lib/types/**/*.d.ts",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/argszero/dsh-empty-tool-result-guard.git"
+  },
+  "homepage": "https://github.com/argszero/dsh-empty-tool-result-guard#readme",
+  "bugs": {
+    "url": "https://github.com/argszero/dsh-empty-tool-result-guard/issues"
+  },
+  "keywords": [
+    "cordis",
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "tool-result",
+    "messages",
+    "llm-stream",
+    "session-recovery"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.2",
+    "@deepseek-ai/dsh-llm": ">=0.1.7-rc.2 <0.1.8-0 || >=0.2.0-rc.1 <0.2.1-0 || >=0.2.1-alpha.1 <0.2.2-0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@deepseek-ai/dsh-llm": "^0.2.1-rc.2",
+    "@types/node": "^24.19.1",
+    "semver": "^7.7.2",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "tsc",
+    "pretest": "tsc",
+    "test": "node --test \"test/*.spec.mjs\"",
+    "test:inject": "node scripts/inject-defects.mjs",
+    "test:mount": "node scripts/mount-smoke.mjs",
+    "test:probe": "node scripts/probe-lines.mjs",
+    "test:table": "node scripts/probe-table.mjs"
+  },
+  "engines": {
+    "node": "^22.19 || >=24"
+  }
+}
