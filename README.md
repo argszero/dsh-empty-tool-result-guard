@@ -148,7 +148,11 @@ Mount it from a dsh profile, or let the bundle patch do it:
 - **14 mutation arms** (`npm run test:inject`), every one caught: a green suite
   that cannot fail proves nothing, so each claimed decision is broken on purpose
   and rebuilt with `--noEmitOnError`.
-- **10/10 probed lines** (`npm run test:probe`): every released
+- **10/10 probed lines** (`npm run test:probe`; each line is installed under
+  `probe/line-<version>/`, which is gitignored, so run
+  `npm install @deepseek-ai/dsh-llm-deepseek@<version>` there first — the script
+  enumerates whatever `probe/line-*` directories exist and fails rather than
+  skips): every released
   `@deepseek-ai/dsh-llm-deepseek` version this package claims is installed, its
   own adapter is driven with an empty tool result, and the captured body must show
   the defect (empty `content`), then show the repair (non-empty `content`) after

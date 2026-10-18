@@ -1,0 +1,1 @@
+{"name":"verify","private":true,"type":"module","dependencies":{"@argszero/dsh-empty-tool-result-guard":"github:argszero/dsh-empty-tool-result-guard#ac14655"}}
